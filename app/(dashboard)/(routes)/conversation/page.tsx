@@ -1,6 +1,7 @@
 "use client";
 
 import * as z from "zod";
+import axios from "axios";
 import { MessageSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,8 +12,21 @@ import { formSchema } from "./constants";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+
+// import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { useState } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+interface ChatCompletionMessageParam {
+  role: "user" | "assistant" | "system";
+  content: string;
+  name?: string;
+}
 
 function ConversationPage() {
+  const router = useRouter();
+  const [messages, setMessages] = useState<ChatCompletionMessageParam[]>([]);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -23,7 +37,24 @@ function ConversationPage() {
   const isLoading = form.formState.isSubmitting;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    console.log(values);
+    try {
+      const userMessage: ChatCompletionMessageParam = {
+        role: "user",
+        content: values.prompt,
+      };
+      const newMessages = [...messages, userMessage];
+
+      const response = await axios.post("/api/conversation", {
+        messages: newMessages,
+      });
+      setMessages((current) => [...current, userMessage, response.data]);
+      form.reset();
+    } catch (error: any) {
+      //TODO open pro model ie: if we get a specific error, we gonna have to trigger a premium model.
+      console.log(error);
+    } finally {
+      router.refresh();
+    }
   };
 
   return (
@@ -67,7 +98,20 @@ function ConversationPage() {
             </form>
           </Form>
         </div>
-        <div className="space-y-4 mt-4">Messages Content</div>
+        <ScrollArea
+          className="mb-2 mt-5 h-[500px] rounded-lg border p-4"
+          // ref={ref}
+        >
+          <div className="space-y-4 mt-4">
+            <div className="flex flex-col-reverse gap-y-4">
+              {messages.map((message) => (
+                <div className="" key={message.content}>
+                  {message.content}
+                </div>
+              ))}
+            </div>
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );
